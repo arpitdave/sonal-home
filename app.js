@@ -401,6 +401,10 @@ function setStatus(t) {
 }
 function modeHint() {
   if (measuring) return 'Measure: click two points on the floor. Esc to stop.';
+  if (matchMedia('(pointer: coarse)').matches) {
+    return { orbit: 'Drag to orbit · pinch to zoom · two fingers to pan', top: 'Drag to pan · pinch to zoom',
+      walk: 'Drag to look · arrows to walk' }[mode];
+  }
   return { orbit: 'Drag to orbit · right-drag to pan · scroll to zoom', top: 'Drag to pan · scroll to zoom',
     walk: 'Drag to look · W A S D to walk' }[mode];
 }
@@ -432,6 +436,7 @@ function addItem(preset) {
   items.push(item);
   save();
   select(item.id);
+  if (phone.matches) setPanel(false);  // show the new item straight away on phones
 }
 
 // ---------- side panel ----------
@@ -696,7 +701,7 @@ addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
 // ---------- view modes ----------
-const viewBtns = [...document.querySelectorAll('#views button')];
+const viewBtns = [...document.querySelectorAll('[data-view]')];  // sidebar + floating bar on phones
 function setMode(m) {
   mode = m;
   viewBtns.forEach(b => b.classList.toggle('on', b.dataset.view === m));
@@ -717,6 +722,7 @@ function setMode(m) {
   sun.position.copy(walk ? SUN_MORNING : SUN_DAY);
   sun.color.set(walk ? '#ffe2bd' : '#fff6e8');
   sun.intensity = walk ? 3 : 2.2;
+  appEl.classList.toggle('walk', walk);
   resize();
 }
 viewBtns.forEach(b => b.onclick = () => setMode(b.dataset.view));
@@ -749,7 +755,24 @@ function resize() {
   ortho.left = -fit * w / h; ortho.right = fit * w / h; ortho.top = fit; ortho.bottom = -fit;
   ortho.updateProjectionMatrix();
 }
-addEventListener('resize', resize);
+new ResizeObserver(resize).observe(view);  // also fires when the panel is shown or hidden
+
+// ---------- side panel: drawer on phones, collapsible on desktop ----------
+const appEl = document.getElementById('app');
+const phone = matchMedia('(max-width: 760px)');
+function setPanel(open) { appEl.classList.toggle('panel-open', open); }
+setPanel(!phone.matches);
+phone.addEventListener('change', e => setPanel(!e.matches));
+document.getElementById('panelToggle').onclick = () => setPanel(!appEl.classList.contains('panel-open'));
+document.getElementById('panelClose').onclick = () => setPanel(false);
+document.getElementById('scrim').onclick = () => setPanel(false);
+
+// on-screen walk buttons for touch screens; they drive the same keys as W A S D
+for (const b of document.querySelectorAll('#walkpad [data-key]')) {
+  const press = on => e => { e.preventDefault(); on ? keys.add(b.dataset.key) : keys.delete(b.dataset.key); };
+  b.addEventListener('pointerdown', press(true));
+  for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, press(false));
+}
 
 // ---------- loop ----------
 const clock = new THREE.Clock();
