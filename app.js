@@ -3,6 +3,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { PRESETS, TYPES, buildModel } from './models.js';
 import { buildEnvironment } from './environment.js';
+import { buildKitchen, buildCeilingDetails } from './kitchen.js';
+import { buildBathroom } from './bathroom.js';
 
 // World units are centimetres. Floor-plan x -> world x, floor-plan y -> world z.
 const house = await (await fetch('house.json')).json();
@@ -126,6 +128,7 @@ const wallMats = [wallMat, wallMat, wallTopMat, wallMat, wallMat, wallMat];
 // door reveals and frames stay white like trim. Muted sage/olive, as in Sonal's Pinterest reference.
 const accentMat = new THREE.MeshStandardMaterial({ color: '#5f7458', roughness: 0.95 });
 const accentMats = [wallMat, wallMat, wallTopMat, wallMat, accentMat, wallMat];
+const skirtMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.5 });
 const glassMat = new THREE.MeshPhysicalMaterial({ color: '#cfe3ee', transparent: true, opacity: 0.25, roughness: 0.05, metalness: 0, depthWrite: false });
 const frameMat = new THREE.MeshStandardMaterial({ color: '#f0f0ee', roughness: 0.6 });
 const railMat = new THREE.MeshStandardMaterial({ color: '#3c3c3c', roughness: 0.5, metalness: 0.4 });
@@ -277,14 +280,86 @@ function buildWalls(maxH) {
     let cur = s0;
     for (const o of ops) {
       addPiece(f, w, cur, o.c0, 0, H, mats);
+      addSkirting(f, w, cur, o.c0);
+      if (o.z > 0) addSkirting(f, w, o.c0, o.c1);
       addPiece(f, w, o.c0, o.c1, 0, Math.min(o.z, H), mats);
       addPiece(f, w, o.c0, o.c1, Math.min(o.z + o.h, H), H, mats);
       if (w.facade) addGlazing(f, w, o, H);
+      else if (o.type === 'door') addCasing(f, w, o, H);
       cur = o.c1;
     }
     addPiece(f, w, cur, s1, 0, H, mats);
+    addSkirting(f, w, cur, s1);
   });
+  DOOR_LEAVES.forEach(d => addLeaf(d, maxH));
   wallGroup.traverse(m => { if (m.isMesh && (m.material === wallMats || m.material === accentMats)) m.userData.solid = true; });
+}
+
+// White architraves around interior door openings (sticking 1.5 cm out of both wall faces).
+function addCasing(f, w, o, H) {
+  const top = o.z + o.h, b = 7, thick = w.t + 3;
+  addPiece(f, w, o.c0 - b, o.c0, 0, Math.min(top + b, H), skirtMat, thick);
+  addPiece(f, w, o.c1, o.c1 + b, 0, Math.min(top + b, H), skirtMat, thick);
+  if (top + b <= H) addPiece(f, w, o.c0 - b, o.c1 + b, top, top + b, skirtMat, thick);
+}
+
+// Interior door leaves, placed as drawn in the Floorplanner plan (hinge side and swing).
+// The bathroom doorway is left without a leaf: open, it would block the narrow hall.
+// Each is an axis-aligned box [x0, x1] x [z0, z1]; `free` is the handle end along the long side.
+const DOOR_LEAVES = [
+  { name: 'Bedroom 1', x0: 246.7, x1: 250.7, z0: 392.2, z1: 478.2, free: 'z1' },     // open into the bedroom
+  { name: 'Bedroom 2', x0: 154.3, x1: 236.3, z0: 286.5, z1: 290.5, free: 'x0' },     // open, against the short wall
+  { name: 'Utility', x0: 438.7, x1: 524.7, z0: 69.6, z1: 73.6, free: 'x0' },         // closed (washer & dryer)
+  { name: 'Front door', x0: 339, x1: 343, z0: 216, z1: 304, free: 'z1' },            // closed
+  { name: 'Meter cupboard', x0: 338.8, x1: 341.8, z0: 84.6, z1: 152.6, free: 'z1' },  // closed
+  { name: 'Shower', x0: 51, x1: 53, z0: 152.5, z1: 230.5, glass: true },
+];
+const leafMat = new THREE.MeshStandardMaterial({ color: '#f7f6f3', roughness: 0.45 });
+const handleMat = new THREE.MeshStandardMaterial({ color: '#cfd2d4', roughness: 0.3, metalness: 0.5 });
+
+function addLeaf(d, maxH) {
+  const leafH = Math.min(d.glass ? 200 : 214, maxH);
+  const alongX = d.x1 - d.x0 > d.z1 - d.z0;
+  const part = (x0, x1, y0, y1, z0, z1, m) => {
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), m);
+    mesh.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+    mesh.castShadow = m !== glassMat;
+    mesh.receiveShadow = true;
+    mesh.userData.solid = !d.glass;
+    wallGroup.add(mesh);
+  };
+  part(d.x0, d.x1, 0, leafH, d.z0, d.z1, d.glass ? glassMat : leafMat);
+  if (d.glass) return;
+  // raised panels on both faces, then a lever handle on each side near the free edge
+  const inset = 9, grow = 0.5;
+  for (const [y0, y1] of [[22, 100], [118, 196]]) {
+    if (y1 > leafH) continue;
+    if (alongX) part(d.x0 + inset, d.x1 - inset, y0, y1, d.z0 - grow, d.z1 + grow, leafMat);
+    else part(d.x0 - grow, d.x1 + grow, y0, y1, d.z0 + inset, d.z1 - inset, leafMat);
+  }
+  if (leafH < 106) return;
+  const end = d[d.free], dir = d.free.endsWith('1') ? -1 : 1, at = end + dir * 7;
+  if (alongX) {
+    part(at - 1, at + 1, 104, 107, d.z0 - 5, d.z1 + 5, handleMat);
+    for (const z of [d.z0 - 5, d.z1 + 5]) part(Math.min(at, at + dir * 13), Math.max(at, at + dir * 13), 104.5, 106.5, z - 1, z + 1, handleMat);
+  } else {
+    part(d.x0 - 5, d.x1 + 5, 104, 107, at - 1, at + 1, handleMat);
+    for (const x of [d.x0 - 5, d.x1 + 5]) part(x - 1, x + 1, 104.5, 106.5, Math.min(at, at + dir * 13), Math.max(at, at + dir * 13), handleMat);
+  }
+}
+
+// 9 cm white skirting on both faces of a wall, or only the room side of an exterior wall.
+function addSkirting(f, w, s0, s1) {
+  if (s1 - s0 < 1) return;
+  const inward = Math.sign((center.x - f.ax) * f.nx + (center.z - f.az) * f.nz) || 1;
+  for (const side of w.facade ? [inward] : [1, -1]) {
+    const o = f.off + side * (w.t / 2 + 0.6), s = (s0 + s1) / 2;
+    const m = new THREE.Mesh(new THREE.BoxGeometry(s1 - s0, 9, 1.2), skirtMat);
+    m.position.set(f.ax + f.ux * s + f.nx * o, 4.5, f.az + f.uz * s + f.nz * o);
+    m.rotation.y = Math.atan2(-f.uz, f.ux);
+    m.receiveShadow = true;
+    wallGroup.add(m);
+  }
 }
 
 function addGlazing(f, w, o, H) {
@@ -304,10 +379,18 @@ surroundings.visible = false;
 scene.add(surroundings);
 const walkFog = new THREE.Fog('#e3e9ed', 2500, 14000);
 
-// ---------- fixed kitchen & bathroom fixtures from the plan ----------
+// ---------- fixed kitchen & bathroom fixtures ----------
+// The kitchen and bathroom are modelled in detail from the listing photos; the rest are simple blocks from the plan.
+const MODELLED_FIXTURES = new Set(['Kitchen counter', 'Fridge column', 'Hob', 'Sink', 'Washbasin', 'Toilet frame', 'Toilet', 'Shower head']);
 const fixtureGroup = new THREE.Group();
 scene.add(fixtureGroup);
-for (const fx of house.fixtures) {
+fixtureGroup.add(buildKitchen());
+const bathroom = buildBathroom();
+fixtureGroup.add(bathroom.group);
+const ceilingDetails = buildCeilingDetails(WALL_H);
+ceilingDetails.visible = false;
+scene.add(ceilingDetails);
+for (const fx of house.fixtures.filter(f => !MODELLED_FIXTURES.has(f.name))) {
   const m = new THREE.Mesh(new THREE.BoxGeometry(fx.w, Math.max(fx.h, 0.5), fx.d),
     new THREE.MeshStandardMaterial({ color: fx.color, roughness: 0.5 }));
   m.position.set(fx.x, fx.y + Math.max(fx.h, 0.5) / 2, fx.z);
@@ -315,14 +398,6 @@ for (const fx of house.fixtures) {
   m.castShadow = m.receiveShadow = true;
   m.userData.solid = true;
   m.userData.name = fx.name;
-  fixtureGroup.add(m);
-}
-// worktop on the kitchen counters
-for (const fx of house.fixtures.filter(f => f.name === 'Kitchen counter')) {
-  const m = new THREE.Mesh(new THREE.BoxGeometry(fx.w, 3, fx.d + 2), new THREE.MeshStandardMaterial({ color: '#4b4845', roughness: 0.4 }));
-  m.position.set(fx.x, fx.h + 1.5, fx.z);
-  m.rotation.y = -THREE.MathUtils.degToRad(fx.rot);
-  m.castShadow = true;
   fixtureGroup.add(m);
 }
 
@@ -509,7 +584,7 @@ function obstacleMeshes(excludeId) {
   const out = [];
   wallGroup.traverse(m => { if (m.isMesh && m.userData.solid) out.push(m); });
   structure.traverse(m => { if (m.isMesh && m.userData.solid && m.parent === structure) out.push(m); });
-  fixtureGroup.children.forEach(m => out.push(m));
+  fixtureGroup.traverse(m => { if (m.isMesh && m.userData.solid) out.push(m); });
   furnitureGroup.traverse(m => { if (m.isMesh && m.userData.itemId !== excludeId) out.push(m); });
   return out;
 }
@@ -718,6 +793,8 @@ function setMode(m) {
   syncWalls();
   const walk = m === 'walk';
   surroundings.visible = walk;
+  ceilingDetails.visible = walk;
+  bathroom.mirror.visible = walk;
   scene.fog = walk ? walkFog : null;
   sun.position.copy(walk ? SUN_MORNING : SUN_DAY);
   sun.color.set(walk ? '#ffe2bd' : '#fff6e8');

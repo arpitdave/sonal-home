@@ -16,7 +16,7 @@ ROOM_NAMES = {  # area guid -> (name, floor material)
     "0ffddc": ("Meter cupboard", "concrete"),
     "e4f931": ("Duct", "duct"),
 }
-SURFACE_NAMES = {"Balkon": ("Balcony", "deck"), "Entree": ("Hall", "oak"), None: ("Kitchen", "kitchen")}
+SURFACE_NAMES = {"Balkon": ("Balcony", "deck"), "Entree": ("Hall", "oak"), None: ("Kitchen", "oak")}
 
 FIXTURES = {  # refid prefix -> (label, colour)
     "856317b2": ("Washing machine", "#f2f2f2"),

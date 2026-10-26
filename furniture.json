@@ -42,8 +42,8 @@
    "h": 71,
    "color": "#151515",
    "elevation": 55,
-   "x": 13,
-   "z": -329,
+   "x": 25,
+   "z": -334,
    "rot": 90
   },
   {
@@ -112,6 +112,33 @@
    "x": 2,
    "z": 460,
    "rot": 270
+  },
+  {
+   "id": "walldesk",
+   "type": "minimaldesk",
+   "name": "Minimal desk (dark oak)",
+   "w": 95,
+   "d": 50,
+   "h": 75,
+   "color": "#4a3a2e",
+   "x": 387.5,
+   "z": 44,
+   "rot": 180,
+   "elevation": 0
+  },
+  {
+   "id": "walldesk-chair",
+   "type": "cosychair",
+   "name": "Boucl\u00e9 desk chair",
+   "w": 52,
+   "d": 50,
+   "h": 72,
+   "seatH": 46,
+   "color": "#e6dccd",
+   "x": 387,
+   "z": 4,
+   "rot": 0,
+   "elevation": 0
   }
  ]
 }

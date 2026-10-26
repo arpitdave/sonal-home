@@ -26,6 +26,9 @@ export const PRESETS = [
   { type: 'wardrobe', name: 'Wardrobe 200', w: 200, d: 60, h: 236, color: '#f1eee8' },
   { type: 'wardrobe', name: 'Wardrobe 100', w: 100, d: 60, h: 201, color: '#f1eee8' },
   { type: 'cabinet', name: 'Dresser', w: 120, d: 48, h: 80, color: '#d8d2c8' },
+  { type: 'walldesk', name: 'Wall desk unit', w: 99, d: 45, h: 257, color: '#3b3029' },
+  { type: 'minimaldesk', name: 'Minimal desk', w: 95, d: 50, h: 75, color: '#4a3a2e' },
+  { type: 'cosychair', name: 'Bouclé desk chair', w: 52, d: 50, h: 72, color: '#e6dccd' },
   { type: 'table', name: 'Desk', w: 140, d: 70, h: 75, color: '#e9e4dc' },
   { type: 'chair', name: 'Office chair', w: 60, d: 60, h: 110, color: '#2d2d2d' },
   { type: 'rug', name: 'Rug 200×300', w: 300, d: 200, h: 1, color: '#b9a891' },
@@ -36,7 +39,7 @@ export const PRESETS = [
 ];
 
 export const TYPES = ['box', 'sofa', 'lsofa', 'cornersofa', 'armchair', 'table', 'roundtable', 'chair', 'cabinet', 'tv',
-  'shelf', 'bed', 'boxspring', 'wardrobe', 'openwardrobe', 'rug', 'plant', 'lamp'];
+  'shelf', 'bed', 'boxspring', 'wardrobe', 'openwardrobe', 'walldesk', 'minimaldesk', 'cosychair', 'rug', 'plant', 'lamp'];
 
 const matCache = new Map();
 function mat(color, opts = {}) {
@@ -273,6 +276,98 @@ const BUILDERS = {
       }
       x = x1;
     });
+  },
+
+  // Built-in desk niche: side panels, back panel, wall-mounted desk with a slim drawer, open shelves,
+  // a closed cabinet at the top (from topH up) and a brass sconce. deskSide mirrors the decor.
+  walldesk(g, { w, d, h, color, deskH = 75, deskD = 55, topH = 220, deskSide = 'right' }) {
+    const s = deskSide === 'left' ? -1 : 1;
+    const X = (a, b) => (s > 0 ? [a, b] : [-b, -a]);
+    const t = 3, back = -d / 2, front = d / 2, inner = shade(color, 1.15), brass = '#b08a52';
+    const nx0 = -w / 2 + t / 2, nx1 = w / 2;
+    const span = ([a, b], y0, y1, z0, z1, c) => box(g, b - a, y1 - y0, z1 - z0, (a + b) / 2, y0, (z0 + z1) / 2, c);
+    span(X(-w / 2, -w / 2 + t), 0, h, back, front, color);
+    span(X(w / 2 - t, w / 2), 0, h, back, front, color);
+    span(X(-w / 2, w / 2), h - 2, h, back, front, color);
+    // desk niche: back panel, desk slab with a slim drawer, open shelves, top cabinet
+    span(X(nx0 + t / 2, w / 2 - t), 0, h - 2, back, back + 1.5, inner);
+    span(X(nx0 + t / 2, w / 2 - t), deskH - 4, deskH, back, back + deskD, color);
+    span(X(nx0 + 8, w / 2 - 8), deskH - 13, deskH - 4, back + deskD - 42, back + deskD - 1, shade(color, 0.9));
+    for (const y of [150, 190]) span(X(nx0 + t / 2, w / 2 - t), y, y + 2.5, back, back + 32, color);
+    span(X(nx0 + t / 2, w / 2 - t), topH + 0.6, h - 2, front - 2, front, color);
+    span(X(nx0 + t / 2, w / 2 - t), topH - 1, topH + 0.6, back, front, color);
+    // things on the shelves and desk
+    const nc = (nx0 + nx1) / 2, cx = (v) => s * v;
+    box(g, 30, 14, 24, cx(nc - 25), 152.5, back + 14, '#d9d2c4');
+    box(g, 30, 10, 24, cx(nc - 25), 166.5, back + 14, '#efebe4');
+    box(g, 22, 18, 22, cx(nc + 22), 152.5, back + 13, '#3b3734');
+    for (let i = 0; i < 6; i++) box(g, 3, 22 + (i % 3) * 2, 18, cx(nc - 30 + i * 3.4), 192.5, back + 11, ['#c9b79c', '#7b2d2d', '#e9e4da', '#2f2f2f'][i % 4]);
+    box(g, 26, 16, 24, cx(nc + 20), 192.5, back + 14, '#d9d2c4');
+    box(g, 33, 1.5, 23, cx(nc - 8), deskH, back + deskD - 22, '#9a9ca0');  // laptop
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(33, 22, 0.8), mat('#2a2c30'));
+    screen.position.set(cx(nc - 8), deskH + 11.5, back + deskD - 33);
+    screen.rotation.x = -0.25;
+    g.add(screen);
+    cyl(g, 4, 3, 16, cx(nc + 30), deskH, back + 16, '#c8ccc6');  // vase with dried flowers
+    const sprig = new THREE.Mesh(new THREE.IcosahedronGeometry(9, 1), mat('#c9a46a', { flatShading: true }));
+    sprig.position.set(cx(nc + 30), deskH + 26, back + 16);
+    g.add(sprig);
+    // brass wall sconce with a warm light
+    box(g, 9, 18, 1.2, cx(nc + 28), 112, back + 1.5, brass);
+    const glow = new THREE.Mesh(new THREE.SphereGeometry(4.5, 16, 12), new THREE.MeshStandardMaterial({ color: '#fff4e0', emissive: '#ffd9a0', emissiveIntensity: 1.6 }));
+    glow.scale.set(1, 1.7, 0.6);
+    glow.position.set(cx(nc + 28), 121, back + 4);
+    g.add(glow);
+    const light = new THREE.PointLight('#ffcf8f', 1.2, 260, 0);
+    light.position.set(cx(nc + 28), 121, back + 12);
+    g.add(light);
+  },
+
+  // Minimal writing desk: thin rounded top, slim drawer apron, slender tapered legs, with a laptop,
+  // a small mushroom lamp (warm light) and a vase on top.
+  minimaldesk(g, { w, d, h, color, legColor }) {
+    const top = 2.5, apron = 7, legC = legColor || shade(color, 0.85);
+    rbox(g, -w / 2, w / 2, h - top, h, -d / 2, d / 2, color, 1.2);
+    box(g, w - 14, apron, d - 12, 0, h - top - apron, -1, shade(color, 0.92));
+    box(g, w * 0.45, 0.6, 0.4, 0, h - top - apron / 2 - 0.3, d / 2 - 6.8, '#b08a52');  // drawer pull line
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      cyl(g, 1.9, 1.2, h - top, sx * (w / 2 - 5), 0, sz * (d / 2 - 5), legC, 12);
+    }
+    box(g, 32, 1.5, 22, -8, h, 4, '#9a9ca0');  // laptop
+    const screen = new THREE.Mesh(new THREE.BoxGeometry(32, 21, 0.8), mat('#2a2c30'));
+    screen.position.set(-8, h + 11.5, -7.5);
+    screen.rotation.x = -0.25;
+    g.add(screen);
+    const lx = w / 2 - 14, lz = -d / 2 + 12;  // mushroom lamp, back corner
+    cyl(g, 6, 6, 1.5, lx, h, lz, '#b08a52');
+    cyl(g, 1, 1, 22, lx, h + 1.5, lz, '#b08a52', 8);
+    const shadeMesh = new THREE.Mesh(new THREE.SphereGeometry(11, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: '#fff3df', emissive: '#ffd9a0', emissiveIntensity: 0.9, side: THREE.DoubleSide }));
+    shadeMesh.position.set(lx, h + 22, lz);
+    g.add(shadeMesh);
+    const light = new THREE.PointLight('#ffcf8f', 1.1, 240, 0);
+    light.position.set(lx, h + 20, lz);
+    g.add(light);
+    cyl(g, 3.5, 2.8, 14, -w / 2 + 12, h, -d / 2 + 10, '#c8ccc6');  // vase with dried flowers
+    const sprig = new THREE.Mesh(new THREE.IcosahedronGeometry(8, 1), mat('#c9a46a', { flatShading: true }));
+    sprig.position.set(-w / 2 + 12, h + 23, -d / 2 + 10);
+    g.add(sprig);
+  },
+
+  // Chunky upholstered chair with a round bolster backrest (bouclé look).
+  cosychair(g, { w, d, h, color, seatH = 46 }) {
+    const dark = shade(color, 0.93);
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const lx = sx * (w / 2 - 11), lz = sz * (d / 2 - 11);
+      rbox(g, lx - 5.5, lx + 5.5, 0, seatH - 10, lz - 5.5, lz + 5.5, dark, 4);
+    }
+    rbox(g, -w / 2, w / 2, seatH - 12, seatH, -d / 2, d / 2, color, 6);
+    for (const sx of [-1, 1]) rbox(g, sx * (w / 2 - 6) - 5, sx * (w / 2 - 6) + 5, seatH, h - 8, -d / 2 + 2, -d / 2 + 12, dark, 4);
+    const bolster = new THREE.Mesh(new THREE.CylinderGeometry(9, 9, w + 2, 24), mat(color));
+    bolster.rotation.z = Math.PI / 2;
+    bolster.position.set(0, h - 9, -d / 2 + 7);
+    bolster.castShadow = true;
+    g.add(bolster);
   },
 
   rug(g, { w, d, h, color }) {
