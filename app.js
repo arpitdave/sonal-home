@@ -7,7 +7,7 @@ import { buildKitchen, buildCeilingDetails } from './kitchen.js';
 import { buildBathroom } from './bathroom.js';
 
 // World units are centimetres. Floor-plan x -> world x, floor-plan y -> world z.
-const house = await (await fetch('house.json')).json();
+const house = await (await fetch('house.json', { cache: 'no-store' })).json();
 const WALL_H = house.wallHeight;
 const CUT_H = 110;
 const EYE_H = 165;
@@ -463,7 +463,7 @@ let lastFile = null;
 
 async function load() {
   try {
-    const r = await fetch('furniture.json');
+    const r = await fetch('furniture.json', { cache: 'no-store' });
     if (r.ok) { lastFile = await r.text(); items = JSON.parse(lastFile).items || []; return; }
   } catch {}
   try { items = JSON.parse(localStorage.getItem('sonal-home-furniture')).items || []; } catch { items = []; }
@@ -873,7 +873,7 @@ function tick() {
 async function syncFromFile() {
   if (drag || savePending || !canSaveFile) return;
   try {
-    const r = await fetch('furniture.json');
+    const r = await fetch('furniture.json', { cache: 'no-store' });
     if (!r.ok) return;
     const text = await r.text();
     if (lastFile === null || text.trim() === lastFile.trim()) return;
